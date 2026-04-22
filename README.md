@@ -104,5 +104,167 @@ main
                                   merge to develop
 
 
+3. CI/CD Pipeline — Jenkins with Slave Nodes
+    Now that we understand the branching strategy, let's talk about how the code actually moves from a developer's machine all the way to           production. We use Jenkins as our CI/CD server, and every environment gets its own dedicated Slave Node — so nothing is shared, nothing         bleeds across environments.
 
-     
+
+   Infrastructure Overview
+   We have one Jenkins Master and four dedicated servers, each mapped to a specific environment:
+   Environment                         Server Setup                                                             Jenkins Slave Label
+   Dev                               Tomcat (App Server only)                                                             dev
+   Test                              Tomcat + Nexus (Artifact Storage)                                                    test
+   UAT                               Tomcat + Nexus (Artifact Storage)                                                    uat
+   Prod                              Tomcat + Nexus (Artifact Storage)                                                    prod
+   
+Each server is registered in Jenkins as a Slave Node with a matching label. When a pipeline runs, Jenkins looks at the label and runs the job on exactly the right server — no mix-ups.
+
+4. How the Pipeline Works — Environment by Environment
+   Code Checkout (develop branch)
+        │
+        ▼
+     Build
+  (Compile & Package)
+        │
+        ▼
+     Test
+  (Unit Tests)
+        │
+        ▼
+    Deploy
+  (Deploy to Dev Tomcat Server)
+        │
+        ▼
+  Dev Team Verifies
+  ✅ Application is live on Dev Server
+  ✅ Security groups, ports, endpoints — all checked
+  ✅ Dev gives the green light
+        │
+        ▼
+  Push changes to release/* branch     
+
+The developer checks the running application on the Dev Server. If everything looks good — the feature works, ports are open, endpoints respond correctly — they push those changes forward to the release branch.
+
+
+5. TEST Environment
+Branch: release/* → Node Label: test
+The release branch pipeline is similar to Dev, but with two important additions — Nexus for artifact storage and a manual approval gate before deployment.
+Code Checkout (release/* branch)
+        │
+        ▼
+     Build
+  (Compile & Package)
+        │
+        ▼
+  Publish Artifact to Nexus
+  (Versioned artifact stored safely)
+        │
+        ▼
+     Test
+  (Automated Tests)
+        │
+        ▼
+  ⏸️  INPUT STAGE — Waiting for Approval
+  "Deploy to Test Environment?" → Manager Approves ✅
+        │
+        ▼
+  Deploy to Test Server
+  (Pull artifact from Nexus → Deploy on Tomcat)
+        │
+        ▼
+  QA Team Tests the Application
+        │
+   ┌────┴────┐
+   │         │
+Pass        Fail
+   │         │
+   ▼         ▼
+Proceed   Report bugs → Dev fixes →
+to UAT    Re-run pipeline on release branch
+The key thing here is the manual approval step. The pipeline pauses and waits for a manager or lead to approve before anything is deployed to the Test Server. This gives the team control — nothing gets pushed without a human sign-off.
+
+
+5.2 UAT Environment
+Branch: release/* → Node Label: uat
+UAT follows the same pattern as Test. The business team or client validates the features in a production-like environment. If UAT passes, the release branch is merged into main. If changes are needed, they go back to the dev team.
+Code Checkout (release/* branch)
+        │
+        ▼
+  Build + Nexus Artifact
+        │
+        ▼
+  ⏸️  INPUT STAGE — Manager Approval
+        │
+        ▼
+  Deploy to UAT Server
+        │
+        ▼
+  Business / Client Validation
+        │
+   ┌────┴────┐
+   │         │
+Pass        Fail
+   │         │
+   ▼         ▼
+Merge      Back to Dev Team
+release → main
+
+
+5.3 PROD Environment
+Branch: main → Node Label: prod
+Production is the final destination. Once the release branch is merged into main, the production pipeline runs against the main branch on the prod slave node. Same pipeline structure — build, artifact, approval, deploy.
+
+Code Checkout (main branch)
+        │
+        ▼
+  Build + Nexus Artifact
+        │
+        ▼
+  ⏸️  INPUT STAGE — Final Approval
+        │
+        ▼
+  Deploy to Prod Server
+        │
+        ▼
+Application Live in Production
+
+
+6. Full CI/CD Flow — Bird's Eye View
+   Developer pushes code
+        │
+        ▼
+  Jenkins detects branch
+        │
+   ┌────┴──────────────────────────────────┐
+   │                                       │
+develop branch                        main branch
+(Dev Pipeline)                       (Prod Pipeline)
+   │                                       │
+   ▼                                       ▼
+Slave Node: dev                    Slave Node: prod
+Build → Test → Deploy Dev          Build → Artifact → Approve → Deploy Prod
+   │
+   ▼
+Dev ✅ → push to release/*
+   │
+   ▼
+Slave Node: test
+Build → Artifact (Nexus) → Approve → Deploy Test
+   │
+   ▼
+QA ✅ → same release/* branch
+   │
+   ▼
+Slave Node: uat
+Build → Artifact (Nexus) → Approve → Deploy UAT
+   │
+   ▼
+UAT ✅ → Merge release/* → main
+   │
+   ▼
+Slave Node: prod
+Build → Artifact (Nexus) → Approve → Deploy Prod
+
+
+Pipeline Stages Summary
+Every Jenkins pipeline across all environments follows these core stages:
+StageDescriptionCheckoutPull code from the correct Git branchBuildCompile the code and package it (e.g., .war / .jar)TestRun automated unit/integration testsArtifactPush build artifact to Nexus (Test / UAT / Prod only)ApprovalManual input gate — manager approves before deploy (Test / UAT / Prod)DeployDeploy artifact to the environment's Tomcat server
