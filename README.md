@@ -109,7 +109,13 @@ main ──► hotfix/critical-fix ──► merge to main
 
 ## 4. CI/CD — Jenkins setup
 
+**Current prod UI**
+
+![Current prod UI](images/Task1.png)
+
 We use Jenkins with one master and four slave nodes. Each environment gets its own dedicated server so nothing leaks across environments.
+
+![Jenkins master and slave layout](images/Task2.png)
 
 | Environment | Server setup                   | Slave label |
 | ----------- | ------------------------------ | ----------- |
@@ -146,6 +152,8 @@ Dev team verifies the app is up, endpoints work, ports are open
 If good → create release/* branch
 ```
 
+![Dev pipeline](images/Task3.png)
+
 No Nexus here, no manual approval. Dev is meant to be fast and cheap.
 
 ### Test
@@ -181,6 +189,8 @@ Pass  Fail
  ▼     ▼
 UAT   Bugs go back to dev → fix on release branch → re-run
 ```
+
+![Test pipeline](images/Task4.png)
 
 The approval step matters. Nothing deploys without a human saying yes.
 
@@ -234,6 +244,16 @@ Deploy to Prod Tomcat
    ▼
 Live
 ```
+
+![Prod pipeline](images/Task5.png)
+
+**Nexus**
+
+![Nexus](images/Task7.png)
+
+**Update UI on current production**
+
+![Update UI on current production](images/Task6.png)
 
 
 ## 6. End-to-end
