@@ -3,15 +3,16 @@ This project follows the Git Flow Branching Strategy — a proven model that kee
 
 
 1.1 Branch Overview:
-     main
+main
  └── develop
        └── feature/your-feature-name
-             └── release/v1.0.0 
+             └── release/v1.0.0
                    └── (merge to main)
 
 main
  └── hotfix/critical-bug-fix
        └── (merge back to main + develop)
+
 
 1.2  Branch Structure & Flow :
 
