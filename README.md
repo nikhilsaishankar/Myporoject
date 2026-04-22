@@ -1,4 +1,4 @@
-Overview
+Overview:
 This project follows the Git Flow Branching Strategy — a proven model that keeps production code stable, development organized, and releases predictable. The branching structure is designed to seamlessly integrate with a CI/CD pipeline, enabling automated builds, testing, and deployments triggered directly from branch activity. While CI/CD pipeline integration is planned for a future phase, the current workflow defines the branching structure and manual deployment process in alignment with those upcoming automation standards, ensuring a smooth transition once the pipeline is in place.
 
 
