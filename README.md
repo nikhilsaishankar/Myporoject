@@ -1,8 +1,13 @@
-Overview:
-This project follows the Git Flow Branching Strategy — a proven model that keeps production code stable, development organized, and releases predictable. The branching structure is designed to seamlessly integrate with a CI/CD pipeline, enabling automated builds, testing, and deployments triggered directly from branch activity. While CI/CD pipeline integration is planned for a future phase, the current workflow defines the branching structure and manual deployment process in alignment with those upcoming automation standards, ensuring a smooth transition once the pipeline is in place.
+# GQ Rapid — CI/CD & Git Workflow
+
+This doc covers two things: the Git branching strategy we follow, and the Jenkins pipeline that ships code from a dev's laptop to production.
+
+We follow Git Flow. It keeps `main` stable, `develop` as the working branch, and uses short-lived feature, release, and hotfix branches for everything else. The CI/CD pipeline is designed around this branching model — though full automation is still a work in progress. For now, the structure and process below are what the team follows manually, so the handoff to automation later is painless.
 
 
-1.1 Branch Overview:
+## 1. Branch overview
+
+```
 main
  └── develop
        └── feature/your-feature-name
@@ -12,259 +17,264 @@ main
 main
  └── hotfix/critical-bug-fix
        └── (merge back to main + develop)
+```
 
 
-1.2  Branch Structure & Flow :
+## 2. Branches
 
-  1. main — Production Branch
-      This is your live, production-ready code. Every commit here represents a stable release that is running for real users. No developer
-      should directly touch this branch. Code only enters main through a controlled merge from release or hotfix branches.
+### main
 
-  2. develop — Integration Branch
-    Taken from: main
-    When the project starts (or after every production release), develop is created as an exact replica of main. This is the main working branch     for the team. All feature branches are created from here, and all finished features come back here first.
-    Think of develop as the staging ground — it reflects what the next release will look like.
+Production code. Whatever is on `main` is what real users are running. Nobody commits here directly — code only lands via a merge from a `release/*` or `hotfix/*` branch.
 
-  3. feature/* — Feature Branches
-     Taken from: develop
-     Merged back to: develop
+### develop
 
-     Whenever a new feature needs to be built, a developer creates a fresh branch from develop.
-     Naming convention:
-       feature/user-authentication
-       feature/payment-gateway
-       feature/dashboard-redesign
+Taken from `main`. This is the team's working branch — feature branches are cut from here, and finished features merge back here. Think of it as what the next release will look like.
 
-     Workflow:
-     Developer builds and tests the feature locally.
-     Once it's working, a Pull Request (PR) is raised to merge back into develop.
-     After code review and approval, it gets merged into develop.
+### feature/*
 
- 4. release/* — Release Branch
-      Taken from: develop
-      Merged to: main (and back to develop)
+Cut from `develop`, merged back to `develop`.
 
-      Once all features for a release are merged into develop and the dev team is confident, a release branch is created. This is handed over to
-      the QA / Testing Team.
- 
-   What happens here:
-     The testing team verifies all features are working correctly.
-     If tests pass → The release branch is merged into main (goes live).
-     If tests fail → Bugs are reported back to the dev team, fixes are made and re-deployed on the release branch.
+Anytime someone builds something new, they branch off `develop`. Name it after the feature:
 
-   After a successful merge to main, the latest main is pulled into develop to keep them in sync.
-     Naming convention:
-        release/v1.0.0
-        release/v1.2.0
+```
+feature/user-authentication
+feature/payment-gateway
+feature/dashboard-redesign
+```
 
- 5. hotfix/* — Hotfix Branch
-    Taken from: main
-    Merged to: main + develop
+Build it, test it locally, raise a PR back to `develop`. Reviewer approves, merge, done.
 
-   Sometimes things break in production. When a critical bug is found on main, a hotfix branch is created directly from main — not from develop.    This allows the team to fix the issue without picking up any unfinished work from develop.
-   Workflow:
-     Developer creates a hotfix branch from main.
-     Bug is diagnosed and fixed.
-     Fix is tested and verified.
-     The hotfix branch is merged back into main (to fix production immediately).
-     The same fix is also merged into develop (to keep both branches in sync).
+### release/*
 
-   Naming convention:
-     hotfix/fix-payment-crash
-     hotfix/fix-login-token-expiry
+Cut from `develop`, merged to `main` (and back into `develop` after).
+
+When `develop` has everything planned for the next release and the team is confident, we cut a release branch. That branch goes to QA.
+
+- If QA passes, release branch merges to `main` — it's live.
+- If QA finds bugs, they go back to the dev team, fixes land on the release branch, QA re-runs.
+
+After merging to `main`, pull `main` back into `develop` so they don't drift.
+
+Naming:
+
+```
+release/v1.0.0
+release/v1.2.0
+```
+
+### hotfix/*
+
+Cut from `main`, merged to `main` and `develop`.
+
+When something breaks in production, we branch off `main` directly — not `develop`, because `develop` has unfinished work we don't want to ship. Fix the bug, test, merge into `main` to unblock production, then also merge into `develop` so the fix isn't lost on the next release.
+
+Naming:
+
+```
+hotfix/fix-payment-crash
+hotfix/fix-login-token-expiry
+```
 
 
+## 3. Full flow
 
-2 Full Flow — Step by Step
+```
+main ──────────────────────────────────── (stable production)
+ │
+ └──► develop ──────────────────────── (replica of main)
+          │
+          └──► feature/xyz ──────────── (new feature work)
+                   │
+                   └──► develop ──────── (feature merged back)
+                            │
+                            └──► release/v1.0.0
+                                      │
+                            ┌─────────┴──────────┐
+                            │                    │
+                        Tests Pass           Tests Fail
+                            │                    │
+                       merge to main        back to devs
+                            │                    │
+                       main (live)        fix → re-release
+                            │
+                       pull latest main into develop
 
-        main ──────────────────────────────────── (stable production)
-         │
-         └──► develop ──────────────────────── (replica of main)
-                  │
-                  └──► feature/xyz ──────────── (new feature work)
-                           │
-                           └──► develop ──────── (feature merged back)
-                                    │
-                                    └──► release/v1.0.0
-                                              │
-                                    ┌─────────┴──────────┐
-                                    │                    │
-                                Tests Pass           Tests Fail
-                                    │                    │
-                               merge to main        back to devs
-                                    │                    │
-                               main (live)        fix → re-release
-                                    │
-                               pull latest main into develop
+── If production breaks ──
 
-─── If production breaks ───
-
-     main ──► hotfix/critical-fix ──► merge to main
-                                          │
-                                  merge to develop
-
-
-3. CI/CD Pipeline — Jenkins with Slave Nodes
-    Now that we understand the branching strategy, let's talk about how the code actually moves from a developer's machine all the way to           production. We use Jenkins as our CI/CD server, and every environment gets its own dedicated Slave Node — so nothing is shared, nothing         bleeds across environments.
+main ──► hotfix/critical-fix ──► merge to main
+                                      │
+                              merge to develop
+```
 
 
-   Infrastructure Overview
-   We have one Jenkins Master and four dedicated servers, each mapped to a specific environment:
-   Environment                         Server Setup                                                             Jenkins Slave Label
-   Dev                               Tomcat (App Server only)                                                             dev
-   Test                              Tomcat + Nexus (Artifact Storage)                                                    test
-   UAT                               Tomcat + Nexus (Artifact Storage)                                                    uat
-   Prod                              Tomcat + Nexus (Artifact Storage)                                                    prod
-   
-Each server is registered in Jenkins as a Slave Node with a matching label. When a pipeline runs, Jenkins looks at the label and runs the job on exactly the right server — no mix-ups.
+## 4. CI/CD — Jenkins setup
 
-4. How the Pipeline Works — Environment by Environment
-   Code Checkout (develop branch)
-        │
-        ▼
-     Build
-  (Compile & Package)
-        │
-        ▼
-     Test
-  (Unit Tests)
-        │
-        ▼
-    Deploy
-  (Deploy to Dev Tomcat Server)
-        │
-        ▼
-  Dev Team Verifies
-  ✅ Application is live on Dev Server
-  ✅ Security groups, ports, endpoints — all checked
-  ✅ Dev gives the green light
-        │
-        ▼
-  Push changes to release/* branch     
+We use Jenkins with one master and four slave nodes. Each environment gets its own dedicated server so nothing leaks across environments.
 
-The developer checks the running application on the Dev Server. If everything looks good — the feature works, ports are open, endpoints respond correctly — they push those changes forward to the release branch.
+| Environment | Server setup                   | Slave label |
+| ----------- | ------------------------------ | ----------- |
+| Dev         | Tomcat                         | `dev`       |
+| Test        | Tomcat + Nexus                 | `test`      |
+| UAT        | Tomcat + Nexus                 | `uat`       |
+| Prod        | Tomcat + Nexus                 | `prod`      |
+
+Each slave is registered in Jenkins with its label. Pipelines pick the right node based on the label, so a test job never accidentally runs on the prod box.
 
 
-5. TEST Environment
-Branch: release/* → Node Label: test
-The release branch pipeline is similar to Dev, but with two important additions — Nexus for artifact storage and a manual approval gate before deployment.
-Code Checkout (release/* branch)
-        │
-        ▼
-     Build
-  (Compile & Package)
-        │
-        ▼
-  Publish Artifact to Nexus
-  (Versioned artifact stored safely)
-        │
-        ▼
-     Test
-  (Automated Tests)
-        │
-        ▼
-  ⏸️  INPUT STAGE — Waiting for Approval
-  "Deploy to Test Environment?" → Manager Approves ✅
-        │
-        ▼
-  Deploy to Test Server
-  (Pull artifact from Nexus → Deploy on Tomcat)
-        │
-        ▼
-  QA Team Tests the Application
-        │
-   ┌────┴────┐
-   │         │
-Pass        Fail
-   │         │
-   ▼         ▼
-Proceed   Report bugs → Dev fixes →
-to UAT    Re-run pipeline on release branch
-The key thing here is the manual approval step. The pipeline pauses and waits for a manager or lead to approve before anything is deployed to the Test Server. This gives the team control — nothing gets pushed without a human sign-off.
+## 5. Pipelines per environment
 
+### Dev
 
-5.2 UAT Environment
-Branch: release/* → Node Label: uat
-UAT follows the same pattern as Test. The business team or client validates the features in a production-like environment. If UAT passes, the release branch is merged into main. If changes are needed, they go back to the dev team.
-Code Checkout (release/* branch)
-        │
-        ▼
-  Build + Nexus Artifact
-        │
-        ▼
-  ⏸️  INPUT STAGE — Manager Approval
-        │
-        ▼
-  Deploy to UAT Server
-        │
-        ▼
-  Business / Client Validation
-        │
-   ┌────┴────┐
-   │         │
-Pass        Fail
-   │         │
-   ▼         ▼
-Merge      Back to Dev Team
+Triggered by: `develop` branch. Runs on node `dev`.
+
+```
+Checkout (develop)
+   │
+   ▼
+Build (compile + package)
+   │
+   ▼
+Unit tests
+   │
+   ▼
+Deploy to Dev Tomcat
+   │
+   ▼
+Dev team verifies the app is up, endpoints work, ports are open
+   │
+   ▼
+If good → create release/* branch
+```
+
+No Nexus here, no manual approval. Dev is meant to be fast and cheap.
+
+### Test
+
+Triggered by: `release/*` branch. Runs on node `test`.
+
+Two things are different from Dev — we publish the build to Nexus, and there's a manual approval gate before anything actually deploys.
+
+```
+Checkout (release/*)
+   │
+   ▼
+Build
+   │
+   ▼
+Publish artifact to Nexus
+   │
+   ▼
+Automated tests
+   │
+   ▼
+⏸ Manual approval — "Deploy to Test?" → manager approves
+   │
+   ▼
+Deploy to Test Tomcat (pull artifact from Nexus)
+   │
+   ▼
+QA tests
+   │
+ ┌─┴─┐
+Pass  Fail
+ │     │
+ ▼     ▼
+UAT   Bugs go back to dev → fix on release branch → re-run
+```
+
+The approval step matters. Nothing deploys without a human saying yes.
+
+### UAT
+
+Triggered by: `release/*` branch. Runs on node `uat`.
+
+Same shape as Test. The difference is who's validating — business or client instead of QA. If UAT signs off, release merges into `main`. If not, it goes back to dev.
+
+```
+Checkout (release/*)
+   │
+   ▼
+Build + push to Nexus
+   │
+   ▼
+⏸ Manual approval
+   │
+   ▼
+Deploy to UAT Tomcat
+   │
+   ▼
+Business / client validates
+   │
+ ┌─┴─┐
+Pass  Fail
+ │     │
+ ▼     ▼
+Merge  Back to dev
 release → main
+```
 
+### Prod
 
-5.3 PROD Environment
-Branch: main → Node Label: prod
-Production is the final destination. Once the release branch is merged into main, the production pipeline runs against the main branch on the prod slave node. Same pipeline structure — build, artifact, approval, deploy.
+Triggered by: `main` branch. Runs on node `prod`.
 
-Code Checkout (main branch)
-        │
-        ▼
-  Build + Nexus Artifact
-        │
-        ▼
-  ⏸️  INPUT STAGE — Final Approval
-        │
-        ▼
-  Deploy to Prod Server
-        │
-        ▼
-Application Live in Production
+Same pipeline shape — build, artifact, approve, deploy. This one's just pointed at the prod box.
 
-
-6. Full CI/CD Flow — Bird's Eye View
-   Developer pushes code
-        │
-        ▼
-  Jenkins detects branch
-        │
-   ┌────┴──────────────────────────────────┐
-   │                                       │
-develop branch                        main branch
-(Dev Pipeline)                       (Prod Pipeline)
-   │                                       │
-   ▼                                       ▼
-Slave Node: dev                    Slave Node: prod
-Build → Test → Deploy Dev          Build → Artifact → Approve → Deploy Prod
+```
+Checkout (main)
    │
    ▼
-Dev ✅ → push to release/*
+Build + push to Nexus
    │
    ▼
-Slave Node: test
-Build → Artifact (Nexus) → Approve → Deploy Test
+⏸ Final approval
    │
    ▼
-QA ✅ → same release/* branch
+Deploy to Prod Tomcat
    │
    ▼
-Slave Node: uat
-Build → Artifact (Nexus) → Approve → Deploy UAT
-   │
-   ▼
-UAT ✅ → Merge release/* → main
-   │
-   ▼
-Slave Node: prod
-Build → Artifact (Nexus) → Approve → Deploy Prod
+Live
+```
 
 
-Pipeline Stages Summary
-Every Jenkins pipeline across all environments follows these core stages:
-StageDescriptionCheckoutPull code from the correct Git branchBuildCompile the code and package it (e.g., .war / .jar)TestRun automated unit/integration testsArtifactPush build artifact to Nexus (Test / UAT / Prod only)ApprovalManual input gate — manager approves before deploy (Test / UAT / Prod)DeployDeploy artifact to the environment's Tomcat server
+## 6. End-to-end
+
+```
+Developer pushes code
+   │
+   ▼
+Jenkins picks the pipeline based on the branch
+   │
+   ├── develop   → node: dev   → build, test, deploy
+   │                 │
+   │                 ▼
+   │               Dev OK → create release/*
+   │                 │
+   │                 ▼
+   │               node: test  → build, Nexus, approve, deploy
+   │                 │
+   │                 ▼
+   │               QA OK → same release/*
+   │                 │
+   │                 ▼
+   │               node: uat   → build, Nexus, approve, deploy
+   │                 │
+   │                 ▼
+   │               UAT OK → merge release/* to main
+   │                 │
+   │                 ▼
+   └── main      → node: prod  → build, Nexus, approve, deploy
+```
+
+
+## 7. Pipeline stages
+
+Every pipeline follows the same six stages. Not all apply to every environment:
+
+| Stage    | What it does                                     | Where it runs      |
+| -------- | ------------------------------------------------ | ------------------ |
+| Checkout | Pull code from the right branch                  | All                |
+| Build    | Compile and package (`.war` / `.jar`)            | All                |
+| Test     | Unit / integration tests                         | All                |
+| Artifact | Push build to Nexus                              | Test, UAT, Prod    |
+| Approval | Manual gate — a human clicks approve             | Test, UAT, Prod    |
+| Deploy   | Deploy to the env's Tomcat                       | All                |
