@@ -1,4 +1,4 @@
-# GQ Rapid — CI/CD & Git Workflow
+# CI/CD & Git Workflow
 
 This doc covers two things: the Git branching strategy we follow, and the Jenkins pipeline that ships code from a dev's laptop to production.
 
